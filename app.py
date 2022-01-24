@@ -107,22 +107,22 @@ def get_comments():
             movie_id = None
             return make_response({'message': 'Bad Request'}, 400)
 
-
         movie = Movie.query.get(movie_id)
         if movie == None:
             return make_response({'message': 'Not Found'}, 404)
 
         comments_db = Comment.query. \
             join(User, Comment.userId == User.id) \
-            .add_columns(User.username, Comment.id, Comment.comment, Comment.movieId) \
+            .add_columns(User.username, Comment.id, Comment.comment, Comment.movieId, Comment.approved) \
             .filter(Comment.movieId == movie_id)
         comments = []
         for comment in comments_db:
-            comments.append({
-                "id": comment.id,
-                "author": comment.username,
-                "body": comment.comment
-            })
+            if comment.approved:
+                comments.append({
+                    "id": comment.id,
+                    "author": comment.username,
+                    "body": comment.comment
+                })
         return make_response(jsonify({
             "movie": movie.name,
             "comments": comments
