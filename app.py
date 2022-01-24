@@ -49,7 +49,7 @@ class Comment(db.Model):
     comment = db.Column(db.String, nullable=False)
     approved = db.Column(db.Boolean, nullable=False)
     createdAt = db.Column(db.DateTime, nullable=False)
-    movieId = db.Column(db.Integer, db.ForeignKey('Movie.id'),nullable=False)
+    movieId = db.Column(db.Integer, db.ForeignKey('Movie.id'), nullable=False)
     movie = db.relationship("Movie", backref=backref("Movie", uselist=False))
 
 
@@ -91,11 +91,12 @@ def get_movie(movie_id):
     try:
         movieId = movie_id
         movie = Movie.query.get(movieId)
-        if(movie == None):
+        if (movie == None):
             return make_response({'message': 'Bad request'}, 400)
         return make_response(jsonify(movie_schema.dump(movie)), 200)
     except Exception as ex:
         return make_response({'message': 'There is an internal issue.'}, 500)
+
 
 @app.route("/comments")
 def get_comments():
@@ -104,12 +105,28 @@ def get_comments():
             movie_id = request.args['movie']
         except Exception as _:
             movie_id = None
-        print(movie_id)
-        if not id:
-            return make_response({'message': 'Bad request'}, 400)
-        comments = Comment.query.filter_by(movieId=movie_id)
-        print(comments)
-        return make_response(jsonify(comments_schema.dump(comments)), 200)
+            return make_response({'message': 'Bad Request'}, 400)
+
+
+        movie = Movie.query.get(movie_id)
+        if movie == None:
+            return make_response({'message': 'Not Found'}, 404)
+
+        comments_db = Comment.query. \
+            join(User, Comment.userId == User.id) \
+            .add_columns(User.username, Comment.id, Comment.comment, Comment.movieId) \
+            .filter(Comment.movieId == movie_id)
+        comments = []
+        for comment in comments_db:
+            comments.append({
+                "id": comment.id,
+                "author": comment.username,
+                "body": comment.comment
+            })
+        return make_response(jsonify({
+            "movie": movie.name,
+            "comments": comments
+        }), 200)
 
     except Exception as ex:
         return make_response({'message': 'There is an internal issue.'}, 500)
