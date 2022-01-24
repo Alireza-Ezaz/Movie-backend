@@ -31,7 +31,7 @@ class User(db.Model):
 class Movie(db.Model):
     __tablename__ = 'Movie'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, unique=True, nullable=False)
+    name = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
     rating = db.Column(db.Float)
 
@@ -130,6 +130,24 @@ def get_comments():
 
     except Exception as ex:
         return make_response({'message': 'There is an internal issue.'}, 500)
+
+
+@app.route("/admin/movie", methods=['POST'])
+def add_movie():
+    try:
+        body = request.get_json()
+        movie_name = body['name']
+        movie_description = body['description']
+    except:
+        return make_response({'message': 'Not Found'}, 404)
+
+    adding_movie = Movie(movie_name, movie_description, 0)
+    print(adding_movie)
+
+    db.session.add(adding_movie)
+    db.session.commit()
+    return make_response(jsonify({"message":"OK"}), 204)
+
 
 
 class UserManager(Resource):
