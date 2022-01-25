@@ -11,7 +11,8 @@ app = Flask(__name__)
 
 api = Api(app)
 app.config['JSON_SORT_KEYS'] = False
-app.config['SECRET_KEY'] = 'NTNv7j0TuYARvmNMmWXo6fKvM4o6nv/aUi9ryX38ZH+L1bkrnD1ObOQ8JAUmHCBq7Iy7otZcyAagBLHVKvvYaIpmMuxmARQ97jUVG16Jkpkp1wXOPsrF9zwew6TpczyHkHgX5EuLg2MeBuiT/qJACs1J0apruOOJCg/gOtkjB4c='
+app.config[
+    'SECRET_KEY'] = 'NTNv7j0TuYARvmNMmWXo6fKvM4o6nv/aUi9ryX38ZH+L1bkrnD1ObOQ8JAUmHCBq7Iy7otZcyAagBLHVKvvYaIpmMuxmARQ97jUVG16Jkpkp1wXOPsrF9zwew6TpczyHkHgX5EuLg2MeBuiT/qJACs1J0apruOOJCg/gOtkjB4c='
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movieApp.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -55,7 +56,6 @@ class Comment(db.Model):
     user = db.relationship("User", backref=backref("User", uselist=False))
     movieId = db.Column(db.Integer, db.ForeignKey('Movie.id'), nullable=False)
     movie = db.relationship("Movie", backref=backref("Movie", uselist=False))
-
 
     def __init__(self, userId, movieId, comment_body):
         self.userId = userId
@@ -109,7 +109,7 @@ movies_schema = MovieSchema(many=True)
 movie_schema = MovieSchema()
 
 
-def token_required(f):
+def check_token(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
@@ -119,7 +119,7 @@ def token_required(f):
             print(token)
         # return 401 if token is not passed
         if not token:
-            return jsonify({'message': 'Token is missing !!'}), 401
+            return jsonify({'message': 'You do NOT have access !'}), 401
 
         try:
             # decoding the payload to fetch the stored details
@@ -133,12 +133,13 @@ def token_required(f):
 
         except:
             return jsonify({
-                'message': 'Token is invalid !!'
+                'message': 'Token is invalid !'
             }), 401
         # returns the current logged in users contex to the routes
         return f(current_user, *args, **kwargs)
 
     return decorated
+
 
 @app.route("/movies")
 def get_movies():
@@ -196,8 +197,10 @@ def get_comments():
 
 
 @app.route("/admin/movie", methods=['POST'])
-@token_required
+@check_token
 def add_movie(current_user):
+    if current_user.role != 1:
+        return jsonify({'message': 'Only admin can do this !'}), 401
     try:
         body = request.get_json()
         movie_name = body['name']
@@ -205,7 +208,7 @@ def add_movie(current_user):
     except:
         return make_response({'message': 'Not Found'}, 404)
 
-    adding_movie = Movie(movie_name, movie_description, 0)
+    adding_movie = Movie(movie_name, movie_description, None)
     print(adding_movie)
 
     db.session.add(adding_movie)
@@ -214,7 +217,10 @@ def add_movie(current_user):
 
 
 @app.route("/admin/movie/<movie_id>", methods=['PUT'])
-def edit_movie(movie_id):
+@check_token
+def edit_movie(current_user, movie_id):
+    if current_user.role != 1:
+        return jsonify({'message': 'Only admin can do this !'}), 401
     try:
         body = request.get_json()
         movie_name = body['name']
@@ -233,7 +239,10 @@ def edit_movie(movie_id):
 
 
 @app.route("/admin/movie/<movie_id>", methods=['DELETE'])
-def remove_movie(movie_id):
+@check_token
+def remove_movie(current_user, movie_id):
+    if current_user.role != 1:
+        return jsonify({'message': 'Only admin can do this !'}), 401
     try:
         if not movie_id.isnumeric():
             return make_response({'message': 'Bad request.'}, 400)
@@ -248,7 +257,10 @@ def remove_movie(movie_id):
 
 
 @app.route("/admin/comment/<comment_id>", methods=['PUT'])
-def edit_comment(comment_id):
+@check_token
+def edit_comment(current_user, comment_id):
+    if current_user.role != 1:
+        return jsonify({'message': 'Only admin can do this !'}), 401
     try:
         body = request.get_json()
         approved = body['approved']
@@ -265,7 +277,10 @@ def edit_comment(comment_id):
 
 
 @app.route("/admin/comment/<comment_id>", methods=['DELETE'])
-def remove_comment(comment_id):
+@check_token
+def remove_comment(current_user, comment_id):
+    if current_user.role != 1:
+        return jsonify({'message': 'Only admin can do this !'}), 401
     try:
         if not comment_id.isnumeric():
             return make_response({'message': 'Bad request.'}, 400)
