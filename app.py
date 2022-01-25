@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from flask_restful import Resource, Api
 from sqlalchemy.orm import backref
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -52,6 +53,28 @@ class Comment(db.Model):
     movieId = db.Column(db.Integer, db.ForeignKey('Movie.id'), nullable=False)
     movie = db.relationship("Movie", backref=backref("Movie", uselist=False))
 
+    def __init__(self, userId, movieId, comment_body):
+        self.userId = userId
+        self.movieId = movieId
+        self.comment = comment_body
+        self.createdAt = datetime.now()
+        self.approved = 0
+
+
+class Vote(db.Model):
+    __tablename__ = 'Vote'
+    id = db.Column(db.Integer, primary_key=True)
+    userId = db.Column(db.Integer, db.ForeignKey('User.id'))
+    user = db.relationship("User", backref=backref("User", uselist=False))
+    rating = db.Column(db.Float)
+    movieId = db.Column(db.Integer, db.ForeignKey('Movie.id'), nullable=False)
+    movie = db.relationship("Movie", backref=backref("Movie", uselist=False))
+
+    def __init__(self, userId, movieId, rating):
+        self.userId = userId
+        self.movieId = movieId
+        self.rating = rating
+
 
 class UserSchema(ma.Schema):
     class Meta:
@@ -66,6 +89,11 @@ class MovieSchema(ma.Schema):
 class CommentSchema(ma.Schema):
     class Meta:
         fields = ('id', 'userId', 'movieId', 'comment', 'createdAt')
+
+
+class VoteSchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'userId', 'movieId', 'rating')
 
 
 user_schema = UserSchema()
@@ -146,8 +174,73 @@ def add_movie():
 
     db.session.add(adding_movie)
     db.session.commit()
-    return make_response(jsonify({"message":"OK"}), 204)
+    return make_response(jsonify({"message": "OK"}), 204)
 
+
+@app.route("/admin/movie/<movie_id>", methods=['PUT'])
+def edit_movie(movie_id):
+    try:
+        body = request.get_json()
+        movie_name = body['name']
+        movie_description = body['description']
+    except:
+        return make_response({'message': 'Bad request.'}, 400)
+    if not movie_id.isnumeric():
+        return make_response({'message': 'Bad request.'}, 400)
+    movie = Movie.query.filter_by(id=movie_id).first()
+    if movie == None:
+        return make_response({'message': 'Bad request.'}, 400)
+    movie.name = movie_name
+    movie.description = movie_description
+    db.session.commit()
+    return make_response(jsonify({"message": "OK"}), 204)
+
+
+@app.route("/admin/movie/<movie_id>", methods=['DELETE'])
+def remove_movie(movie_id):
+    try:
+        if not movie_id.isnumeric():
+            return make_response({'message': 'Bad request.'}, 400)
+        removing_movie = Movie.query.get(movie_id)
+        if removing_movie == None:
+            return make_response({'message': 'Bad request.'}, 400)
+        Movie.query.filter_by(id=movie_id).delete()
+        db.session.commit()
+        return make_response(jsonify({"message": "OK"}), 204)
+    except:
+        return make_response({'message': 'There was an internal issue.'}, 500)
+
+
+@app.route("/admin/comment/<comment_id>", methods=['PUT'])
+def edit_comment(comment_id):
+    try:
+        body = request.get_json()
+        approved = body['approved']
+    except:
+        return make_response({'message': 'Bad request.'}, 400)
+    if not comment_id.isnumeric():
+        return make_response({'message': 'Bad request.'}, 400)
+    comment = Comment.query.filter_by(id=comment_id).first()
+    if (comment == None) or (type(approved) != type(False)):
+        return make_response({'message': 'Bad request.'}, 400)
+    comment.approved = approved
+    db.session.commit()
+    return make_response(jsonify({"message": "OK"}), 204)
+
+
+@app.route("/admin/comment/<comment_id>", methods=['DELETE'])
+def remove_comment(comment_id):
+    try:
+        if not comment_id.isnumeric():
+            return make_response({'message': 'Bad request.'}, 400)
+        removing_comment = Comment.query.get(comment_id)
+        if removing_comment == None:
+            return make_response({'message': 'Bad request.'}, 400)
+        Comment.query.filter_by(id=comment_id).delete()
+        db.session.commit()
+        return make_response(jsonify({"message": "OK"}), 204)
+    except:
+        return make_response({'message': 'There was an internal issue.'}, 500)
 
 
 class UserManager(Resource):
