@@ -335,8 +335,14 @@ def add_vote(current_user):
         return make_response({'message': 'Bad request(rate must be between 0 and 1).'}, 400)
 
     adding_vote = Vote(current_user.id, movie_id, rating)
-
     db.session.add(adding_vote)
+    db.session.commit()
+
+    editing_movie = Movie.query.get(movie_id)
+    if editing_movie.rating == None:
+        editing_movie.rating = rating
+    else:
+        editing_movie.rating = (editing_movie.rating + rating) / 2.0
     db.session.commit()
     return make_response(jsonify({"message": "OK"}), 200)
 
