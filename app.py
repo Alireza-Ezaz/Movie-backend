@@ -11,15 +11,18 @@ app = Flask(__name__)
 
 api = Api(app)
 app.config['JSON_SORT_KEYS'] = False
+
+# using following key we can decode jwt bearers
 app.config[
     'SECRET_KEY'] = 'NTNv7j0TuYARvmNMmWXo6fKvM4o6nv/aUi9ryX38ZH+L1bkrnD1ObOQ8JAUmHCBq7Iy7otZcyAagBLHVKvvYaIpmMuxmARQ97jUVG16Jkpkp1wXOPsrF9zwew6TpczyHkHgX5EuLg2MeBuiT/qJACs1J0apruOOJCg/gOtkjB4c='
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movieApp.db'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movieApp.db' # Specify database name
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
-
+# Our database tables(models) are defined here
 class User(db.Model):
     __tablename__ = 'User'
     id = db.Column(db.Integer, primary_key=True)
@@ -79,7 +82,7 @@ class Vote(db.Model):
         self.movieId = movieId
         self.rating = rating
 
-
+# Our database shemas are defined here
 class UserSchema(ma.Schema):
     class Meta:
         fields = ('id', 'username', 'password', 'role')
@@ -102,13 +105,11 @@ class VoteSchema(ma.Schema):
 
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
-
 comments_schema = CommentSchema(many=True)
-
 movies_schema = MovieSchema(many=True)
 movie_schema = MovieSchema()
 
-
+# Check_token will take responsibility of processing jwt tokens and handle authentication
 def check_token(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -140,7 +141,7 @@ def check_token(f):
 
     return decorated
 
-
+# Here we define our APIs
 @app.route("/movies")
 def get_movies():
     try:
@@ -213,7 +214,7 @@ def add_movie(current_user):
 
     db.session.add(adding_movie)
     db.session.commit()
-    return make_response(jsonify({"message": "OK"}), 204)
+    return make_response(jsonify({"message": "OK"}), 200)
 
 
 @app.route("/admin/movie/<movie_id>", methods=['PUT'])
@@ -292,6 +293,46 @@ def remove_comment(current_user, comment_id):
         return make_response(jsonify({"message": "OK"}), 204)
     except:
         return make_response({'message': 'There was an internal issue.'}, 500)
+
+
+@app.route("/user/comment", methods=['POST'])
+@check_token
+def add_comment(current_user):
+    if current_user.role != 0:
+        return jsonify({'message': 'Only user can do this !'}), 401
+    try:
+        body = request.get_json()
+        movie_id = body['movie_id']
+        comment_body = body['comment_body']
+    except:
+        return make_response({'message': 'Bad request.'}, 400)
+
+    adding_comment = Comment(current_user.id, movie_id, comment_body)
+
+    db.session.add(adding_comment)
+    db.session.commit()
+    return make_response(jsonify({"message": "OK"}), 200)
+
+
+@app.route("/user/vote", methods=['POST'])
+@check_token
+def add_vote(current_user):
+    if current_user.role != 0:
+        return jsonify({'message': 'Only user can do this !'}), 401
+    try:
+        body = request.get_json()
+        movie_id = body['movie_id']
+        rating = body['vote']
+    except:
+        return make_response({'message': 'Bad request.'}, 400)
+    if rating > 1 or rating < 0:
+        return make_response({'message': 'Bad request(rate must be between 0 and 1).'}, 400)
+
+    adding_vote = Vote(current_user.id, movie_id, rating)
+
+    db.session.add(adding_vote)
+    db.session.commit()
+    return make_response(jsonify({"message": "OK"}), 200)
 
 
 class UserManager(Resource):
