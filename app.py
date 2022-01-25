@@ -178,7 +178,7 @@ def get_comments():
         movie = Movie.query.get(movie_id)
         if movie == None:
             return make_response({'message': 'Not Found'}, 404)
-
+        print(movie.name)
         comments_db = Comment.query. \
             join(User, Comment.userId == User.id) \
             .add_columns(User.username, Comment.id, Comment.comment, Comment.movieId, Comment.approved) \
@@ -197,6 +197,7 @@ def get_comments():
         }), 200)
 
     except Exception as ex:
+        print(ex)
         return make_response({'message': 'There is an internal issue.'}, 500)
 
 
