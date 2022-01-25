@@ -4,11 +4,14 @@ from flask_marshmallow import Marshmallow
 from flask_restful import Resource, Api
 from sqlalchemy.orm import backref
 from datetime import datetime
+from functools import wraps
+import jwt
 
 app = Flask(__name__)
 
 api = Api(app)
 app.config['JSON_SORT_KEYS'] = False
+app.config['SECRET_KEY'] = 'NTNv7j0TuYARvmNMmWXo6fKvM4o6nv/aUi9ryX38ZH+L1bkrnD1ObOQ8JAUmHCBq7Iy7otZcyAagBLHVKvvYaIpmMuxmARQ97jUVG16Jkpkp1wXOPsrF9zwew6TpczyHkHgX5EuLg2MeBuiT/qJACs1J0apruOOJCg/gOtkjB4c='
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movieApp.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -45,13 +48,14 @@ class Movie(db.Model):
 class Comment(db.Model):
     __tablename__ = 'Comment'
     id = db.Column(db.Integer, primary_key=True)
-    userId = db.Column(db.Integer, db.ForeignKey('User.id'))
-    user = db.relationship("User", backref=backref("User", uselist=False))
     comment = db.Column(db.String, nullable=False)
     approved = db.Column(db.Boolean, nullable=False)
     createdAt = db.Column(db.DateTime, nullable=False)
+    userId = db.Column(db.Integer, db.ForeignKey('User.id'))
+    user = db.relationship("User", backref=backref("User", uselist=False))
     movieId = db.Column(db.Integer, db.ForeignKey('Movie.id'), nullable=False)
     movie = db.relationship("Movie", backref=backref("Movie", uselist=False))
+
 
     def __init__(self, userId, movieId, comment_body):
         self.userId = userId
@@ -64,11 +68,11 @@ class Comment(db.Model):
 class Vote(db.Model):
     __tablename__ = 'Vote'
     id = db.Column(db.Integer, primary_key=True)
-    userId = db.Column(db.Integer, db.ForeignKey('User.id'))
-    user = db.relationship("User", backref=backref("User", uselist=False))
     rating = db.Column(db.Float)
+    userId = db.Column(db.Integer, db.ForeignKey('User.id'))
+    user = db.relationship("User", backref=backref("User2", uselist=False))
     movieId = db.Column(db.Integer, db.ForeignKey('Movie.id'), nullable=False)
-    movie = db.relationship("Movie", backref=backref("Movie", uselist=False))
+    movie = db.relationship("Movie", backref=backref("Movie2", uselist=False))
 
     def __init__(self, userId, movieId, rating):
         self.userId = userId
@@ -104,6 +108,37 @@ comments_schema = CommentSchema(many=True)
 movies_schema = MovieSchema(many=True)
 movie_schema = MovieSchema()
 
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        # jwt is passed in the request header
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization']
+            print(token)
+        # return 401 if token is not passed
+        if not token:
+            return jsonify({'message': 'Token is missing !!'}), 401
+
+        try:
+            # decoding the payload to fetch the stored details
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            print(data)
+            current_user = User.query \
+                .filter_by(id=data['userId']) \
+                .first()
+            # current_user = User.query.get(data['userId'])
+            print(current_user)
+
+        except:
+            return jsonify({
+                'message': 'Token is invalid !!'
+            }), 401
+        # returns the current logged in users contex to the routes
+        return f(current_user, *args, **kwargs)
+
+    return decorated
 
 @app.route("/movies")
 def get_movies():
@@ -161,7 +196,8 @@ def get_comments():
 
 
 @app.route("/admin/movie", methods=['POST'])
-def add_movie():
+@token_required
+def add_movie(current_user):
     try:
         body = request.get_json()
         movie_name = body['name']
