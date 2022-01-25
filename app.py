@@ -117,7 +117,10 @@ def check_token(f):
         # jwt is passed in the request header
         if 'Authorization' in request.headers:
             token = request.headers['Authorization']
-            print(token)
+            tokens = token.split()
+            if len(tokens) > 1:
+                token = token.split()[1]
+
         # return 401 if token is not passed
         if not token:
             return jsonify({'message': 'You do NOT have access !'}), 401
@@ -324,6 +327,8 @@ def add_vote(current_user):
         movie_id = body['movie_id']
         rating = body['vote']
     except:
+        return make_response({'message': 'Bad request.'}, 400)
+    if Movie.query.get(movie_id) == None:
         return make_response({'message': 'Bad request.'}, 400)
     if rating > 1 or rating < 0:
         return make_response({'message': 'Bad request(rate must be between 0 and 1).'}, 400)
